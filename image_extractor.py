@@ -88,7 +88,7 @@ import re
 def extract_all_captions(full_text):
     """Read out all the figure caption from the whole text"""
 
-    pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.\:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
+    pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
     matches = re.findall(pattern, full_text, re.IGNORECASE | re.DOTALL)
     
     return [m.strip()[:300] for m in matches] #take the first 300 characters of the caption
