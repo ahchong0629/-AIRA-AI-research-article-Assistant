@@ -3,17 +3,19 @@ from file_extractor import extract_text_from_pdf
 from summarizer import summarize_paper
 from image_extractor import extract_images_with_context, find_and_describe_key_image
 
+
 def process_pdf(pdf_file):
     if pdf_file is None:
         return "Please upload a PDF file.", ""
     
     pdf_path = pdf_file.name 
     
+    
     text = extract_text_from_pdf(pdf_path)
     summary = summarize_paper(text)
-    
     images = extract_images_with_context(pdf_path)
     key_image_result = find_and_describe_key_image(images)
+    
     
     image_section = f"""
     
@@ -24,6 +26,7 @@ def process_pdf(pdf_file):
     
     full_output = summary + image_section
     
+    # 保存到 txt
     with open("summary_output.txt", "w", encoding="utf-8") as f:
         f.write(full_output)
     
