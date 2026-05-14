@@ -1,46 +1,16 @@
 import pymupdf
 import base64
 
-def extract_images_with_context(pdf_path):
-    doc = pymupdf.open(pdf_path)
-    results = []
-
-    for page_num, page in enumerate(doc):
-        images = page.get_images()
-        
-        
-        pages_to_check = [page_num - 1, page_num, page_num + 1]
-        combined_text = ""
-        for p in pages_to_check:
-            if 0 <= p < len(doc):
-                combined_text += doc[p].get_text()
-
-        for img_index, img in enumerate(images):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-            image_ext = base_image["ext"]
-
-            results.append({
-                "page": page_num + 1,
-                "image_b64": image_b64,
-                "image_ext": image_ext,
-                "page_text": combined_text  
-            })
-
-    return results
-    
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=("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"))
 
 def describe_image(image_data):
     prompt = f"""
-    You are analyzing a figure from a scientific paper.
+    You are analyzing the most important figure from a scientific paper.
     
     Below is the text from the same page as this figure:
     {image_data['page_text'][:3000]}
@@ -54,7 +24,7 @@ def describe_image(image_data):
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o",  
+        model="gpt-4o", 
         messages=[{
             "role": "user",
             "content": [
@@ -68,9 +38,11 @@ def describe_image(image_data):
             ]
         }]
     )
+
     return response.choices[0].message.content
+
 def find_and_describe_key_image(images):
-    
+   
     selection_prompt = """
     You are analyzing figures from a scientific paper.
     I will show you all the figures. Your job is to identify which single figure 
@@ -79,7 +51,7 @@ def find_and_describe_key_image(images):
     Reply with ONLY a number (e.g. "3") indicating which figure is most important.
     """
     
-    # 把所有图片打包进一个 message
+    
     content = [{"type": "text", "text": selection_prompt}]
     for i, img in enumerate(images):
         content.append({
@@ -98,10 +70,10 @@ def find_and_describe_key_image(images):
         messages=[{"role": "user", "content": content}]
     )
     
+   
     chosen_index = int(selection_response.choices[0].message.content.strip()) - 1
     print(f"LLM selected figure {chosen_index + 1} as most important")
-    
-    
+   
     key_image = images[chosen_index]
     description = describe_image(key_image)
     
