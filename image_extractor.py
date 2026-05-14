@@ -6,8 +6,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = OpenAI(api_key=("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"))
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def describe_image(image_data):
     prompt = f"""
     You are analyzing the most important figure from a scientific paper.
