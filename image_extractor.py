@@ -49,7 +49,7 @@ def describe_image(image_data):
     """
 
     response = client.chat.completions.create(
-        model="gpt-4o",  # 注意：必须用 gpt-4o，不是 mini，因为需要 vision
+        model="gpt-4o",  
         messages=[{
             "role": "user",
             "content": [
@@ -63,5 +63,45 @@ def describe_image(image_data):
             ]
         }]
     )
-
     return response.choices[0].message.content
+def find_and_describe_key_image(images):
+    
+    selection_prompt = """
+    You are analyzing figures from a scientific paper.
+    I will show you all the figures. Your job is to identify which single figure 
+    is most central to the paper's main argument or result.
+    
+    Reply with ONLY a number (e.g. "3") indicating which figure is most important.
+    """
+    
+    # 把所有图片打包进一个 message
+    content = [{"type": "text", "text": selection_prompt}]
+    for i, img in enumerate(images):
+        content.append({
+            "type": "text", 
+            "text": f"Figure {i+1} (page {img['page']}):"
+        })
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/{img['image_ext']};base64,{img['image_b64']}"
+            }
+        })
+    
+    selection_response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": content}]
+    )
+    
+    chosen_index = int(selection_response.choices[0].message.content.strip()) - 1
+    print(f"LLM selected figure {chosen_index + 1} as most important")
+    
+    
+    key_image = images[chosen_index]
+    description = describe_image(key_image)
+    
+    return {
+        "figure_number": chosen_index + 1,
+        "page": key_image["page"],
+        "analysis": description
+    }
