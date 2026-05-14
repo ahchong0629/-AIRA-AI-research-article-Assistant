@@ -82,3 +82,45 @@ def find_and_describe_key_image(images):
         "page": key_image["page"],
         "analysis": description
     }
+
+import re
+
+def extract_all_captions(full_text):
+    """Read out all the figure caption from the whole text"""
+
+    pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.\:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
+    matches = re.findall(pattern, full_text, re.IGNORECASE | re.DOTALL)
+    
+    return [m.strip()[:300] for m in matches] #take the first 300 characters of the caption
+
+def extract_images_with_context(pdf_path):
+    doc = pymupdf.open(pdf_path)
+    
+    
+    full_text = "" #take all the text
+    for page in doc:
+        full_text += page.get_text()
+    
+    all_captions = extract_all_captions(full_text) # read out all the caption
+    print(f"Found {len(all_captions)} captions in full text")
+    
+    results = []
+    for page_num, page in enumerate(doc):
+        images = page.get_images()
+        for img_index, img in enumerate(images):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_b64 = base64.b64encode(base_image["image"]).decode("utf-8")
+            
+            
+            caption_index = len(results)
+            caption = all_captions[caption_index] if caption_index < len(all_captions) else "Caption not found"
+            
+            results.append({
+                "page": page_num + 1,
+                "image_b64": image_b64,
+                "image_ext": base_image["ext"],
+                "page_text": caption  
+            })
+    
+    return results
