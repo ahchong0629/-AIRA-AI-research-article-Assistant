@@ -26,8 +26,8 @@ def process_pdf(pdf_file):
     
     full_output = summary + image_section
     
-    # 保存到 txt
-    with open("summary_output.txt", "w", encoding="utf-8") as f:
+
+    with open("summary_output.txt", "w", encoding="utf-8") as f: #save it to txt
         f.write(full_output)
     
     return full_output
