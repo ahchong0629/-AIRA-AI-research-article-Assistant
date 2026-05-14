@@ -7,14 +7,16 @@ def summarize_paper(text):
     You are an academic paper analysis assistant.
     Read the following paper and extract these four sections:
 
+    - TITLE: Just directly copy and paste the title.
+    - Authors: List out all the authors.
     - MOTIVATION: Why did the authors do this research? What problem does it address?
     - GOAL: What is the specific objective of this paper?
     - HOW (Procedure): What methods or experiments did they use?
     - RESULT: What are the main findings and conclusions?
+    - QUESTION: What remains unclear in the paper?
 
     Paper content:
-    {text[:8000]}
-
+    {text[:10000]}
     Output clearly in English with each section labeled by its title.
     """
     
