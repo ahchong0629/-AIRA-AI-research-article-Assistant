@@ -8,7 +8,7 @@ def extract_images_with_context(pdf_path):
     for page_num, page in enumerate(doc):
         images = page.get_images()
         
-
+        
         pages_to_check = [page_num - 1, page_num, page_num + 1]
         combined_text = ""
         for p in pages_to_check:
