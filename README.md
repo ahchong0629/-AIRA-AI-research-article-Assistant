@@ -43,7 +43,7 @@ It should show something like "* Running on local URL:  http://127.0.0.1:7919"
 Please note that the brain might make mistake, please verify the given information beforehands.
 
 ## Author 
-Wei Chuang Lee· [@ahchong0629] (https://github.com/ahchong0629)
+Wei Chuang Lee· [@ahchong0629](https://github.com/ahchong0629)
 
 
 ## License 
