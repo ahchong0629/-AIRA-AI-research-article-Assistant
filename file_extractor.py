@@ -1,32 +1,11 @@
 import fitz,pymupdf  # PyMuPDF
 
-def extract_images_with_context(pdf_path):
+def extract_text_from_pdf(pdf_path):
     doc = pymupdf.open(pdf_path)
-    results = []
+    print(f'The document has {len(doc)} pages.')
+    all_text = ""
+    for page in doc:
+        all_text += page.get_text()
+    return all_text
 
-    for page_num, page in enumerate(doc):
-        images = page.get_images()
-        
-        
-        pages_to_check = [page_num - 1, page_num, page_num + 1]
-        combined_text = ""
-        for p in pages_to_check:
-            if 0 <= p < len(doc):
-                combined_text += doc[p].get_text()
-
-        for img_index, img in enumerate(images):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-            image_ext = base_image["ext"]
-
-            results.append({
-                "page": page_num + 1,
-                "image_b64": image_b64,
-                "image_ext": image_ext,
-                "page_text": combined_text  
-            })
-
-    return results
 
