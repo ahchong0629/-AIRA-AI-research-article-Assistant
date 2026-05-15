@@ -32,7 +32,8 @@ Simply upload the PDF file of the article and AIRA will provide the following:
 
 
 ## Installation and Usage
-Please install <pip install -r requirements.txt> and if you are using macOS/Linux, simply just run <python3 main.py> . It should provide you the corresponding local URL to start AIRA. 
+Please install 
+'''bash pip install -r requirements.txt ''' and if you are using macOS/Linux, simply just run <python3 main.py> . It should provide you the corresponding local URL to start AIRA. 
 
 It should show something like "* Running on local URL:  http://127.0.0.1:7919"
 
