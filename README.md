@@ -1,4 +1,4 @@
-# Learning_ML
+# AI research article assistant
 
 Version 1: 15 May 2026, 
 Author: ahchong0629
@@ -39,7 +39,10 @@ It should show something like "* Running on local URL:  http://127.0.0.1:7919"
 
 
 ------------- Author --------------
+Wei Chuang Lee
 
+
+------------ License --------------
 Copyright (c) 2026 Wei chuang Lee
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to conditions.
