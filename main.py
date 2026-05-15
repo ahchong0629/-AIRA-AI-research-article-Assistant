@@ -13,7 +13,7 @@ from openai import OpenAI
 
 timer_label = gr.Textbox(label="Processing Time", interactive=False)
 load_dotenv()
-client = OpenAI(api_key=)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))) #If you use Jupyter, just replace "os.getenv("OPENAI_API_KEY")" with your api_key
 # ===== FILE EXTRACTOR =====
 def extract_text_from_pdf(pdf_path):
     doc = pymupdf.open(pdf_path)
