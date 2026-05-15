@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-# ===== IMAGE EXTRACTOR =====
+
 def extract_all_captions(full_text):
     pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
     matches = re.findall(pattern, full_text, re.IGNORECASE | re.DOTALL)
