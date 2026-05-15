@@ -4,21 +4,6 @@ from summarizer import summarize_paper
 from image_extractor import extract_images_with_context, find_and_describe_key_image
 
 
-def process_and_chat(pdf_file):
-    start_time = time.time()
-    
-    # step 1 
-    chunks = split_pdf(pdf_file)
-    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Chunking done..."
-    
-    # step 2
-    summary = merge_summaries(chunks)
-    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Summarizing done..."
-    
-    # done
-    elapsed = time.time() - start_time
-    elap=str(elapsed)
-    yield final_result
 
 def process_pdf(pdf_file):
     start_time = time.time()
