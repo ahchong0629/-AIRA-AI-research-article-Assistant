@@ -1,3 +1,5 @@
+#Version1 AIRA
+#Author: Weichuang Lee
 import pymupdf
 import base64
 import re
