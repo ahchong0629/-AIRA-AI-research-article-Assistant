@@ -188,21 +188,6 @@ def find_and_describe_key_image(images):
 # ===== GRADIO APP =====
 
 
-def process_and_chat(pdf_file):
-    start_time = time.time()
-    
-    # step 1 
-    chunks = split_pdf(pdf_file)
-    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Chunking done..."
-    
-    # step 2
-    summary = merge_summaries(chunks)
-    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Summarizing done..."
-    
-    # done
-    elapsed = time.time() - start_time
-    elap=str(elapsed)
-    yield final_result
 
 def process_pdf(pdf_file):
     start_time = time.time()
@@ -243,7 +228,7 @@ with gr.Blocks(title="AI Research Paper Summarizer") as app:
     
     
     submit_btn.click(
-        fn=process_pdf_with_timer,
+        fn=process_pdf,
         inputs=[pdf_input],
         outputs=[output_box]
     )
