@@ -2,12 +2,13 @@ import pymupdf
 import base64
 import re
 import gradio as gr
-from openai import OpenAI
 import os
-from dotenv import load_dotenv
-from PIL import Image
 import io
 import time
+from dotenv import load_dotenv
+from PIL import Image
+from openai import OpenAI
+
 timer_label = gr.Textbox(label="Processing Time", interactive=False)
 load_dotenv()
 client = OpenAI(api_key=)
