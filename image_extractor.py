@@ -7,119 +7,117 @@ from dotenv import load_dotenv
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-def describe_image(image_data):
-    prompt = f"""
-    You are analyzing the most important figure from a scientific paper.
-    
-    Below is the text from the same page as this figure:
-    {image_data['page_text'][:3000]}
-    
-    Please provide:
-    1. FIGURE CAPTION: Find and quote the exact caption for this figure from the page text above (e.g. "Figure 1: ...")
-    2. DESCRIPTION: What does this figure show? (2-3 sentences)
-    3. IMPORTANCE: Why is this figure important to the paper's argument? (1-2 sentences)
-    
-    If no caption is found, write "Caption not found on this page."
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4o", 
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/{image_data['image_ext']};base64,{image_data['image_b64']}"
-                    }
-                }
-            ]
-        }]
-    )
-
-    return response.choices[0].message.content
-
-def find_and_describe_key_image(images):
-   
-    selection_prompt = """
-    You are analyzing figures from a scientific paper.
-    I will show you all the figures. Your job is to identify which single figure 
-    is most central to the paper's main argument or result.
-    
-    Reply with ONLY a number (e.g. "3") indicating which figure is most important.
-    """
-    
-    
-    content = [{"type": "text", "text": selection_prompt}]
-    for i, img in enumerate(images):
-        content.append({
-            "type": "text", 
-            "text": f"Figure {i+1} (page {img['page']}):"
-        })
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/{img['image_ext']};base64,{img['image_b64']}"
-            }
-        })
-    
-    selection_response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": content}]
-    )
-    
-   
-    chosen_index = int(selection_response.choices[0].message.content.strip()) - 1
-    print(f"LLM selected figure {chosen_index + 1} as most important")
-   
-    key_image = images[chosen_index]
-    description = describe_image(key_image)
-    
-    return {
-        "figure_number": chosen_index + 1,
-        "page": key_image["page"],
-        "analysis": description
-    }
-
-import re
-
+# ===== IMAGE EXTRACTOR =====
 def extract_all_captions(full_text):
-    """Read out all the figure caption from the whole text"""
-
     pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
     matches = re.findall(pattern, full_text, re.IGNORECASE | re.DOTALL)
-    
-    return [m.strip()[:300] for m in matches] #take the first 300 characters of the caption
+    return [m.strip()[:300] for m in matches]
 
 def extract_images_with_context(pdf_path):
     doc = pymupdf.open(pdf_path)
-    
-    
-    full_text = "" #take all the text
+    full_text = ""
     for page in doc:
         full_text += page.get_text()
     
-    all_captions = extract_all_captions(full_text) # read out all the caption
-    print(f"Found {len(all_captions)} captions in full text")
+    all_captions = extract_all_captions(full_text)
+    num_real_figures = len(all_captions)
+    print(f"Found {num_real_figures} real figures via captions")
+    
+    all_images = [] #Now, I have to colour the figure as a compromised way to get the LLM to learn
+    for page_num, page in enumerate(doc):
+        mat = pymupdf.Matrix(2, 2) #double the resolution
+        pix = page.get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
+        image_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        all_images.append({
+            "page": page_num + 1,
+            "image_b64": image_b64,
+            "image_ext": "png",
+        })
+    
     
     results = []
-    for page_num, page in enumerate(doc):
-        images = page.get_images()
-        for img_index, img in enumerate(images):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_b64 = base64.b64encode(base_image["image"]).decode("utf-8")
-            
-            
-            caption_index = len(results)
-            caption = all_captions[caption_index] if caption_index < len(all_captions) else "Caption not found"
-            
-            results.append({
-                "page": page_num + 1,
-                "image_b64": image_b64,
-                "image_ext": base_image["ext"],
-                "page_text": caption  
-            })
+    for i, img in enumerate(all_images[:num_real_figures]):
+        img["page_text"] = all_captions[i] if i < len(all_captions) else "Caption not found"
+        results.append(img)
+    
+    print(f"Using {len(results)} images for analysis")
+    return results
+
+def convert_to_png_b64(base_image):
+    img_data = base_image["image"]
+    img = Image.open(io.BytesIO(img_data)).convert("RGB")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def describe_image(images, index, caption):
+    prompt = f"""
+    You are analyzing Figure {index} from a scientific paper.
+    Caption: {caption}
+    Please provide:
+    1. FIGURE CAPTION: Quote the caption above.
+    2. DESCRIPTION: What does this figure show? (2-3 sentences)
+    3. IMPORTANCE: Why is this figure important? (1-2 sentences)
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {
+                "url": f"data:image/{images['image_ext']};base64,{images['image_b64']}"
+            }}
+        ]}]
+    )
+    return response.choices[0].message.content
+
+def pick_key_figure(descriptions):
+    # Build a summary of all figures
+    figures_summary = "\n\n".join([
+        f"Figure {i+1}:\n{desc}" 
+        for i, desc in enumerate(descriptions)
+    ])
+    
+    prompt = f"""
+    You are an expert scientific reviewer. Below are descriptions of all figures in a paper.
+    
+    {figures_summary}
+    
+    Identify which single figure is the most central to the paper's main contribution.
+    Prioritize figures that show: key experimental results, performance comparisons, or the core methodology.
+    
+    Reply in this exact format:
+    FIGURE: <number>
+    REASON: <one sentence explanation>
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # cheaper for text-only comparison
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = response.choices[0].message.content.strip()
+    print(f"[DEBUG] Picker response: {raw}")
+    
+    match = re.search(r'FIGURE:\s*(\d+)', raw)
+    return int(match.group(1)) - 1 if match else 0  # return index
+
+def find_and_describe_key_image(images):
+    descriptions = []
+    for i, img in enumerate(images):
+        print(f"Describing figure {i+1}/{len(images)}...")
+        desc = describe_image(img, i+1, img['page_text'])
+        descriptions.append(desc)
+        print(f"Figure {i+1}: {desc[:80]}...")
+    
+    print("Picking key figure...")
+    chosen_index = pick_key_figure(descriptions)
+    print(f"Selected figure {chosen_index + 1}")
+    
+    return {
+        "figure_number": chosen_index + 1,
+        "page": images[chosen_index]["page"],
+        "description": descriptions[chosen_index]
+    }
+
     
     return results
