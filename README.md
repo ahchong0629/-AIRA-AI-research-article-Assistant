@@ -27,7 +27,9 @@ Simply upload the PDF file of the article and AIRA will provide the following:
 
 1. AIRA is supported by using python (for coding), OpenAI GPT-4o (for the brain), Gradio (for the interactive interface), PymuPDF (for extracting the text).
 
-2. Please update your own OpenAI API key (set in ".env" file)
+2. Please update your own OpenAI API key (set in ".env" file, format: 'OPENAI_API_KEY=sk-xxxxx')
+
+(If you need help to know where to find the OpenAI API key, please visit: https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key)
 
 
 
@@ -37,7 +39,8 @@ Please install
 
 It should show something like "* Running on local URL:  http://127.0.0.1:7919"
 
-
+## Note
+Please note that the brain might make mistake, please verify the given information beforehands.
 
 ## Author 
 Wei Chuang Lee· [@ahchong0629] (https://github.com/ahchong0629)
