@@ -34,7 +34,13 @@ def summarize_chunk(chunk, chunk_num, total_chunks):
     prompt = f"""
     You are analyzing part {chunk_num} of {total_chunks} of a scientific paper.
     Extract any relevant information about:
-    - TITLE, AUTHORS, MOTIVATION, GOAL, HOW, RESULT, QUESTION
+    - TITLE (only if found in this section)
+    - AUTHORS (only if found in this section)
+    - MOTIVATION / problem being solved
+    - GOAL / objective
+    - HOW / methods and procedures
+    - RESULT / findings and conclusions
+    - QUESTION / what remains unclear
     If a section is not present, write "Not found in this section."
     Paper section: {chunk}
     """
@@ -103,38 +109,6 @@ def extract_images_with_context(pdf_path):
     
     print(f"Using {len(results)} images for analysis")
     return results
-# def extract_images_with_context(pdf_path):
-#     doc = pymupdf.open(pdf_path)
-#     full_text = ""
-#     for page in doc:
-#         full_text += page.get_text()
-    
-#     all_captions = extract_all_captions(full_text)
-#     num_real_figures = len(all_captions)  # Avoiding taking tables 
-#     print(f"Found {num_real_figures} real figures via captions")
-    
-#     #Here we prevent taking icon/anything which could be irrelevant 
-#     all_images = []
-#     for page_num, page in enumerate(doc):
-#         for img in page.get_images():
-#             xref = img[0]
-#             base_image = doc.extract_image(xref)
-#             if base_image["width"] < 150 or base_image["height"] < 150:
-#                 continue
-#             all_images.append({
-#                 "page": page_num + 1,
-#                 "image_b64": convert_to_png_b64(base_image),  
-#                 "image_ext": "png"
-#             })
-    
-#     # combining two filters
-#     results = []
-#     for i, img in enumerate(all_images[:num_real_figures]):
-#         img["page_text"] = all_captions[i] if i < len(all_captions) else "Caption not found"
-#         results.append(img)
-    
-#     print(f"Using {len(results)} images for analysis")
-#     return results
 
 def convert_to_png_b64(base_image):
     img_data = base_image["image"]
@@ -210,55 +184,6 @@ def find_and_describe_key_image(images):
         "page": images[chosen_index]["page"],
         "description": descriptions[chosen_index]
     }
-# def find_and_describe_key_image(images):
-#     #This function send one picture to analyze each time, avoid token limit
-#     scores = []
-#     for i, img in enumerate(images):
-#         prompt = prompt = f"""
-#                 You are an expert scientific reviewer analyzing a figure from a research paper.
-
-#                 Figure number: {i+1}
-#                 Figure caption: {img['page_text']}
-
-#                 Evaluate this figure and rate its importance to the paper's core contribution on a scale of 1-100, based on the following criteria:
-
-                
-# - How many times it is cited in the Results section (strong signal)
-# - Whether the caption describes a key finding vs. a supplementary result
-# - Whether it shows quantitative performance comparison or main methodology
-
-#                 Deduct points if the figure appears to be:
-#                 - A supplementary or appendix figure
-#                 - A standard baseline or reference comparison with no novel contribution
-#                 - A decorative or schematic overview with low information density
-
-# Think step by step, then on the LAST LINE reply with ONLY a single integer from 1-100.
-# """
-#         response = client.chat.completions.create(
-#             model="gpt-4o",
-#             messages=[{"role": "user", "content": [
-#                 {"type": "text", "text": prompt},
-#                 {"type": "image_url", "image_url": {
-#                     "url": f"data:image/{img['image_ext']};base64,{img['image_b64']}"
-#                 }}
-#             ]}]
-#         )
-#         try:
-#             score = int(response.choices[0].message.content.strip())
-#         except:
-#             score = 0
-#         print(f"Figure {i+1}: score {score}")
-#         scores.append(score)
-    
-#     # 选分数最高的
-#     chosen_index = scores.index(max(scores))
-#     print(f"Selected figure {chosen_index + 1} as most important")
-#     key_image = images[chosen_index]
-#     return {
-#         "figure_number": chosen_index + 1,
-#         "page": key_image["page"],
-#         "analysis": describe_image(key_image)
-#     }
 
 # ===== GRADIO APP =====
 
