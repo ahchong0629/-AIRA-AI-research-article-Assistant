@@ -1,36 +1,325 @@
-from file_extractor import extract_text_from_pdf
-from summarizer import summarize_paper
-from image_extractor import extract_images_with_context, find_and_describe_key_image
+import pymupdf
+import base64
+import re
+import gradio as gr
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+from PIL import Image
+import io
+import time
+timer_label = gr.Textbox(label="Processing Time", interactive=False)
+load_dotenv()
+client = OpenAI(api_key=)
+# ===== FILE EXTRACTOR =====
+def extract_text_from_pdf(pdf_path):
+    doc = pymupdf.open(pdf_path)
+    print(f'The document has {len(doc)} pages.')
+    all_text = ""
+    for page in doc:
+        all_text += page.get_text()
+    return all_text
 
-def save_summary(summary, output_path="summary_output.txt"):
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(summary)
-    print(f"Summary saved to {output_path}")
+# ===== SUMMARIZER =====
+def chunk_text(text, chunk_size=3000, overlap=200):
+    chunks = []
+    start = 0
+    while start < len(text):
+        chunks.append(text[start:start + chunk_size])
+        start += chunk_size - overlap
+    return chunks
 
-def main(pdf_path):
-    print("Extracting text from PDF...")
+def summarize_chunk(chunk, chunk_num, total_chunks):
+    prompt = f"""
+    You are analyzing part {chunk_num} of {total_chunks} of a scientific paper.
+    Extract any relevant information about:
+    - TITLE, AUTHORS, MOTIVATION, GOAL, HOW, RESULT, QUESTION
+    If a section is not present, write "Not found in this section."
+    Paper section: {chunk}
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+def merge_summaries(chunk_summaries):
+    combined = "\n\n---\n\n".join(chunk_summaries)
+    prompt = f"""
+    Synthesize these partial summaries into one final summary with sections:
+    TITLE, AUTHORS, MOTIVATION, GOAL, HOW (Procedure), RESULT, QUESTION
+    Remove repetitions. Partial summaries: {combined}
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+def summarize_paper(text):
+    chunks = chunk_text(text)
+    print(f"Paper split into {len(chunks)} chunks")
+    chunk_summaries = []
+    for i, chunk in enumerate(chunks):
+        print(f"Processing chunk {i+1}/{len(chunks)}...")
+        chunk_summaries.append(summarize_chunk(chunk, i+1, len(chunks)))
+    print("Merging summaries...")
+    return merge_summaries(chunk_summaries)
+
+# ===== IMAGE EXTRACTOR =====
+def extract_all_captions(full_text):
+    pattern = r'(Fig(?:ure|\.)\s*\d+[a-z]?[\.:].*?)(?=Fig(?:ure|\.)\s*\d+|$)'
+    matches = re.findall(pattern, full_text, re.IGNORECASE | re.DOTALL)
+    return [m.strip()[:300] for m in matches]
+
+def extract_images_with_context(pdf_path):
+    doc = pymupdf.open(pdf_path)
+    full_text = ""
+    for page in doc:
+        full_text += page.get_text()
+    
+    all_captions = extract_all_captions(full_text)
+    num_real_figures = len(all_captions)
+    print(f"Found {num_real_figures} real figures via captions")
+    
+    all_images = [] #Now, I have to colour the figure as a compromised way to get the LLM to learn
+    for page_num, page in enumerate(doc):
+        mat = pymupdf.Matrix(2, 2) #double the resolution
+        pix = page.get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
+        image_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        all_images.append({
+            "page": page_num + 1,
+            "image_b64": image_b64,
+            "image_ext": "png",
+        })
+    
+    
+    results = []
+    for i, img in enumerate(all_images[:num_real_figures]):
+        img["page_text"] = all_captions[i] if i < len(all_captions) else "Caption not found"
+        results.append(img)
+    
+    print(f"Using {len(results)} images for analysis")
+    return results
+# def extract_images_with_context(pdf_path):
+#     doc = pymupdf.open(pdf_path)
+#     full_text = ""
+#     for page in doc:
+#         full_text += page.get_text()
+    
+#     all_captions = extract_all_captions(full_text)
+#     num_real_figures = len(all_captions)  # Avoiding taking tables 
+#     print(f"Found {num_real_figures} real figures via captions")
+    
+#     #Here we prevent taking icon/anything which could be irrelevant 
+#     all_images = []
+#     for page_num, page in enumerate(doc):
+#         for img in page.get_images():
+#             xref = img[0]
+#             base_image = doc.extract_image(xref)
+#             if base_image["width"] < 150 or base_image["height"] < 150:
+#                 continue
+#             all_images.append({
+#                 "page": page_num + 1,
+#                 "image_b64": convert_to_png_b64(base_image),  
+#                 "image_ext": "png"
+#             })
+    
+#     # combining two filters
+#     results = []
+#     for i, img in enumerate(all_images[:num_real_figures]):
+#         img["page_text"] = all_captions[i] if i < len(all_captions) else "Caption not found"
+#         results.append(img)
+    
+#     print(f"Using {len(results)} images for analysis")
+#     return results
+
+def convert_to_png_b64(base_image):
+    img_data = base_image["image"]
+    img = Image.open(io.BytesIO(img_data)).convert("RGB")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def describe_image(images, index, caption):
+    prompt = f"""
+    You are analyzing Figure {index} from a scientific paper.
+    Caption: {caption}
+    Please provide:
+    1. FIGURE CAPTION: Quote the caption above.
+    2. DESCRIPTION: What does this figure show? (2-3 sentences)
+    3. IMPORTANCE: Why is this figure important? (1-2 sentences)
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {
+                "url": f"data:image/{images['image_ext']};base64,{images['image_b64']}"
+            }}
+        ]}]
+    )
+    return response.choices[0].message.content
+
+def pick_key_figure(descriptions):
+    # Build a summary of all figures
+    figures_summary = "\n\n".join([
+        f"Figure {i+1}:\n{desc}" 
+        for i, desc in enumerate(descriptions)
+    ])
+    
+    prompt = f"""
+    You are an expert scientific reviewer. Below are descriptions of all figures in a paper.
+    
+    {figures_summary}
+    
+    Identify which single figure is the most central to the paper's main contribution.
+    Prioritize figures that show: key experimental results, performance comparisons, or the core methodology.
+    
+    Reply in this exact format:
+    FIGURE: <number>
+    REASON: <one sentence explanation>
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # cheaper for text-only comparison
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = response.choices[0].message.content.strip()
+    print(f"[DEBUG] Picker response: {raw}")
+    
+    match = re.search(r'FIGURE:\s*(\d+)', raw)
+    return int(match.group(1)) - 1 if match else 0  # return index
+
+def find_and_describe_key_image(images):
+    descriptions = []
+    for i, img in enumerate(images):
+        print(f"Describing figure {i+1}/{len(images)}...")
+        desc = describe_image(img, i+1, img['page_text'])
+        descriptions.append(desc)
+        print(f"Figure {i+1}: {desc[:80]}...")
+    
+    print("Picking key figure...")
+    chosen_index = pick_key_figure(descriptions)
+    print(f"Selected figure {chosen_index + 1}")
+    
+    return {
+        "figure_number": chosen_index + 1,
+        "page": images[chosen_index]["page"],
+        "description": descriptions[chosen_index]
+    }
+# def find_and_describe_key_image(images):
+#     #This function send one picture to analyze each time, avoid token limit
+#     scores = []
+#     for i, img in enumerate(images):
+#         prompt = prompt = f"""
+#                 You are an expert scientific reviewer analyzing a figure from a research paper.
+
+#                 Figure number: {i+1}
+#                 Figure caption: {img['page_text']}
+
+#                 Evaluate this figure and rate its importance to the paper's core contribution on a scale of 1-100, based on the following criteria:
+
+                
+# - How many times it is cited in the Results section (strong signal)
+# - Whether the caption describes a key finding vs. a supplementary result
+# - Whether it shows quantitative performance comparison or main methodology
+
+#                 Deduct points if the figure appears to be:
+#                 - A supplementary or appendix figure
+#                 - A standard baseline or reference comparison with no novel contribution
+#                 - A decorative or schematic overview with low information density
+
+# Think step by step, then on the LAST LINE reply with ONLY a single integer from 1-100.
+# """
+#         response = client.chat.completions.create(
+#             model="gpt-4o",
+#             messages=[{"role": "user", "content": [
+#                 {"type": "text", "text": prompt},
+#                 {"type": "image_url", "image_url": {
+#                     "url": f"data:image/{img['image_ext']};base64,{img['image_b64']}"
+#                 }}
+#             ]}]
+#         )
+#         try:
+#             score = int(response.choices[0].message.content.strip())
+#         except:
+#             score = 0
+#         print(f"Figure {i+1}: score {score}")
+#         scores.append(score)
+    
+#     # 选分数最高的
+#     chosen_index = scores.index(max(scores))
+#     print(f"Selected figure {chosen_index + 1} as most important")
+#     key_image = images[chosen_index]
+#     return {
+#         "figure_number": chosen_index + 1,
+#         "page": key_image["page"],
+#         "analysis": describe_image(key_image)
+#     }
+
+# ===== GRADIO APP =====
+
+
+def process_and_chat(pdf_file):
+    start_time = time.time()
+    
+    # step 1 
+    chunks = split_pdf(pdf_file)
+    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Chunking done..."
+    
+    # step 2
+    summary = merge_summaries(chunks)
+    yield gr.update(), f"⏱ {time.time() - start_time:.1f}s - Summarizing done..."
+    
+    # done
+    elapsed = time.time() - start_time
+    elap=str(elapsed)
+    yield final_result
+
+def process_pdf(pdf_file):
+    start_time = time.time()
+
+    if pdf_file is None:
+        return "Please upload a PDF file."
+    pdf_path = pdf_file.name
     text = extract_text_from_pdf(pdf_path)
-
-    print("Sending to LLM for summarization...")
     summary = summarize_paper(text)
-
-    print("Analyzing key figure...")
     images = extract_images_with_context(pdf_path)
     key_image_result = find_and_describe_key_image(images)
-    
     image_section = f"""
 ===== KEY FIGURE (Figure {key_image_result['figure_number']}, Page {key_image_result['page']}) =====
 
-{key_image_result['analysis']}
+{key_image_result['description']}
 """
+    elapsed = time.time() - start_time
+    elap=str(elapsed)
+    full_output = summary + "\n\n" + image_section +"\n\n"+"Processing time:" +elap
 
-    full_output = summary + "\n\n" + image_section
-
-    print("\n===== PAPER SUMMARY =====\n")
-    print(full_output)
-
-    save_summary(full_output)
+    
+    with open("summary_output.txt", "w", encoding="utf-8") as f:
+        f.write(full_output)
     return full_output
 
-if __name__ == "__main__":
-    main("paper.pdf")
+
+
+with gr.Blocks(title="AI Research Paper Summarizer") as app:
+    gr.Markdown("## AI Research Paper Summarizer")
+    gr.Markdown("Upload a PDF and get a structured summary with key figure analysis. This includes motivation, goal, procedure, results and the open question of the article.\n\nThe machine can make mistakes. Please verify beforehand.")
+    
+    with gr.Row():
+        pdf_input = gr.File(label="Upload your paper (PDF)")
+    
+    submit_btn = gr.Button("Analyze Paper", variant="primary")
+    
+    output_box = gr.Textbox(label="Paper Summary", lines=30)
+    
+    
+    submit_btn.click(
+        fn=process_pdf_with_timer,
+        inputs=[pdf_input],
+        outputs=[output_box]
+    )
+
+app.launch()
