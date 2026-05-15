@@ -2,4 +2,4 @@ mkdir ai-paper-summarizer
 cd ai-paper-summarizer
 python -m venv venv
 source venv/bin/activate  # For Windows: venv\Scripts\activate
-pip install pymupdf openai gradio
+pip install pymupdf openai gradio python-dotenv
