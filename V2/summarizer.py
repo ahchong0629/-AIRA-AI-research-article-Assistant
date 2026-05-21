@@ -4,7 +4,7 @@ import os
 
 timer_label = gr.Textbox(label="Processing Time", interactive=False)
 load_dotenv("env.txt")
-client = OpenAI(api_key=
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) #If you use Jupyter, just replace "os.getenv("OPENAI_API_KEY")" with your api_key
 # ===== SUMMARIZER =====
 def chunk_text(text, chunk_size=3000, overlap=200):
     chunks = []
