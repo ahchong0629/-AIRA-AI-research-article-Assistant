@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from PIL import Image
 import io
 load_dotenv("env.txt")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) #If you use Jupyter, just replace "os.getenv("OPENAI_API_KEY")" with your api_key
 
 # ===== IMAGE EXTRACTOR =====
 def extract_all_captions(full_text):
