@@ -1,3 +1,11 @@
+import gradio as gr
+import time
+timer_label = gr.Textbox(label="Processing Time", interactive=False)
+
+from file_extractor import extract_text_from_pdf,split_pdf
+from summarizer import summarize_paper,merge_summaries
+from image_extractor import extract_images_with_context, find_and_describe_key_image
+
 def process_and_chat(pdf_file):
     start_time = time.time()
     
